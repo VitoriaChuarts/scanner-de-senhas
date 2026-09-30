@@ -87,6 +87,7 @@ def escanear_historico_git(caminho_repositorio):
 
     return todos_achados
 
+
 def salvar_relatorio(achados, caminho_saida="relatorio.json"):
     with open(caminho_saida, "w", encoding="utf-8") as arquivo_saida:
         json.dump(achados, arquivo_saida, indent=4, ensure_ascii=False)
@@ -96,6 +97,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Procura segredos expostos em arquivos e no histórico do Git.")
     parser.add_argument("pasta", nargs="?", default=".", help="pasta a escanear (padrão: pasta atual)")
     args = parser.parse_args()
+
+    if not os.path.isdir(args.pasta):
+        parser.error(f"a pasta '{args.pasta}' não existe")
 
     resultados = escanear_pasta(args.pasta)
     resultados_historico = escanear_historico_git(args.pasta)
