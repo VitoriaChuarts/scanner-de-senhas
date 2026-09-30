@@ -1,5 +1,3 @@
-﻿# scanner-de-senhas
-
 # CODE SCANNER
 
 Ferramenta em Python que varre arquivos, repositórios e o histórico de commits do Git em busca de credenciais expostas no código-fonte — chaves de API, tokens de acesso e outros segredos que não deveriam estar versionados.
@@ -13,47 +11,64 @@ O que muita gente não percebe: **remover a credencial do código não é sufici
 ## O que o scanner faz
 
 - Varre recursivamente uma pasta e todas as suas subpastas
-- Usa expressões regulares para identificar padrões conhecidos de credenciais (ex: chaves AWS, tokens do GitHub)
-- **Varre também todo o histórico de commits do Git**, encontrando segredos que já foram removidos do código atual mas continuam expostos em versões antigas
-- Ignora automaticamente pastas irrelevantes (`.git`, `node_modules`, `__pycache__`, `venv`) e o próprio relatório gerado, evitando falsos positivos
-- Reporta o arquivo (ou commit), a linha e o tipo de segredo encontrado
+- Usa expressões regulares para identificar padrões conhecidos de credenciais (chaves de acesso da AWS e tokens do GitHub)
+- **Varre também o histórico de commits do Git**, encontrando segredos que já foram removidos do código atual mas continuam expostos em versões antigas
+- Reporta o arquivo (ou o commit), o número da linha e o tipo de segredo encontrado
+- **Mascara os segredos** no terminal e no relatório: só os 4 primeiros caracteres aparecem
+- Ignora pastas irrelevantes (`.git`, `node_modules`, `__pycache__`, `venv`, `.venv`) e o próprio relatório gerado, evitando falsos positivos
 - Salva os resultados em um relatório estruturado (`relatorio.json`)
 
 ## Como usar
 
-```bash
-python code_scanner.py
+Requisitos: Python 3 e Git instalados. Não há nada para instalar com `pip`.
+
+```
+python code_scanner.py                 # escaneia a pasta atual
+python code_scanner.py C:\meu\projeto  # escaneia outra pasta
+python code_scanner.py --help          # mostra a ajuda
 ```
 
-Por padrão, escaneia a pasta atual (estado atual + histórico completo do Git, se houver um repositório `.git` presente). Para escanear outro diretório, edite os caminhos passados para `escanear_pasta()` e `escanear_historico_git()`.
+Se a pasta informada não existir, o programa avisa e encerra, em vez de dizer que está tudo limpo. Se a pasta não for um repositório Git, ele mostra um aviso e escaneia só os arquivos.
 
-## Dependências
-
-```bash
-pip install gitpython
-```
-
-O restante usa apenas bibliotecas padrão do Python (`re`, `os`, `json`).
+O `relatorio.json` é gravado na pasta onde o comando foi executado.
 
 ## Exemplo de saída
 
-[AWS Key]: .\config.py:12 -> AKIA1234567890ABCDEF
-[GitHub Token]: teste.txt (commit 8b71974):2 -> ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+[AWS Key]: .\teste.txt:1 -> AKIA********
+[GitHub Token]: .\teste.txt:2 -> ghp_********
+[AWS Key]: teste.txt (commit f7d2897):1 -> AKIA********
+[GitHub Token]: teste.txt (commit f7d2897):2 -> ghp_********
+```
 
+As duas primeiras linhas vêm da varredura dos arquivos atuais; as duas últimas, do histórico, com o hash do commit onde o segredo foi introduzido. O `teste.txt` do repositório contém chaves falsas, só para demonstração.
 
-Repare que o histórico mostra o hash do commit onde o segredo foi encontrado — permitindo rastrear exatamente quando a credencial foi introduzida.
+## Como o histórico é varrido
+
+O scanner executa `git log -p -U0`, que mostra, para cada commit, apenas as linhas que ele **adicionou**. Ele lê essa saída linha por linha, guardando o commit e o arquivo atuais, e procura segredos só nas linhas adicionadas. Usa também os marcadores `@@` do Git para calcular o número correto da linha.
+
+Com isso, cada segredo aparece **uma única vez**, no commit em que entrou. Uma versão anterior olhava o conteúdo completo de todos os arquivos em cada commit, e o mesmo segredo se repetia em todos os commits em que existia.
 
 ## Segurança do próprio projeto
 
-O `relatorio.json` gerado contém, em texto puro, qualquer credencial encontrada — por isso ele está listado no `.gitignore` e também na lista de arquivos ignorados pelo próprio scanner, evitando que seja enviado ao repositório ou reescaneado indevidamente.
+- Os segredos aparecem mascarados (`AKIA********`) no terminal e no `relatorio.json`, para que a própria ferramenta não vaze o que encontrou.
+- O `relatorio.json` está no `.gitignore` e na lista de arquivos ignorados pelo scanner, evitando que seja enviado ao repositório ou reescaneado.
+
+## Limitações
+
+- Só reconhece dois padrões (chave de acesso da AWS e token do GitHub)
+- Varre o histórico da branch atual
+- Não sabe diferenciar segredo real de exemplo: um valor de teste com o formato certo também é marcado
+- Não verifica se a credencial ainda está ativa; todo achado deve ser tratado como comprometido e rotacionado
 
 ## Próximos passos
 
 - Adicionar mais padrões de detecção (chaves privadas SSH, strings de conexão de banco de dados)
+- Varrer o histórico de todas as branches
 - Detecção por entropia, para identificar segredos sem formato conhecido
+- Testes automatizados
 - Gerar relatório em formato HTML, além do JSON
-- Transformar em ferramenta de linha de comando (CLI) com argumentos configuráveis
 
 ## Tecnologias
 
-Python 3, módulo `re`, `os`, `json` (biblioteca padrão) e `GitPython`
+Python 3 (biblioteca padrão: `re`, `os`, `json`, `subprocess`, `argparse`) e Git.
