@@ -67,19 +67,24 @@ def escanear_historico_git(caminho_repositorio):
 
     commit_atual = None
     arquivo_atual = None
+    numero_linha_atual = 0
 
     for linha in r.stdout.splitlines():
         if linha.startswith("commit "):
             commit_atual = linha[7:14]
         elif linha.startswith("+++ b/"):
             arquivo_atual = linha[6:]
-        elif linha.startswith("+"):
+        elif linha.startswith("@@"):
+            numero_linha_atual = int(re.search(r"\+(\d+)", linha).group(1))
+        elif linha.startswith("+") and not linha.startswith("+++ "):
             referencia = f"{arquivo_atual} (commit {commit_atual})"
             achados = testar_conteudo(linha[1:], referencia)
+            for achado in achados:
+                achado["linha"] = numero_linha_atual
             todos_achados.extend(achados)
+            numero_linha_atual = numero_linha_atual + 1
 
     return todos_achados
-
 
 def salvar_relatorio(achados, caminho_saida="relatorio.json"):
     with open(caminho_saida, "w", encoding="utf-8") as arquivo_saida:
