@@ -8,8 +8,12 @@ padroes = {
     "GitHub Token": r"ghp_[0-9A-Za-z]{36}",
 }
 
-PASTAS_IGNORADAS = {".git", "node_modules", "__pycache__", "venv"}
+PASTAS_IGNORADAS = {".git", "node_modules", "__pycache__", "venv", ".venv"}
 ARQUIVOS_IGNORADOS = {"relatorio.json"}
+
+
+def ocultar(segredo):
+    return segredo[:4] + "*" * 8
 
 
 def testar_conteudo(texto, nome_referencia):
@@ -22,7 +26,7 @@ def testar_conteudo(texto, nome_referencia):
                     "documento": nome_referencia,
                     "linha": numero_linha,
                     "tipo": nome_segredo,
-                    "trecho": resultado.group()
+                    "trecho": ocultar(resultado.group())
                 })
     return achados
 
@@ -52,13 +56,17 @@ def escanear_pasta(caminho_pasta):
 
 def escanear_historico_git(caminho_repositorio):
     todos_achados = []
-    r = subprocess.run(["git", "-C", caminho_repositorio, "log", "-p", "-U0", "--pretty=format:commit %H"], capture_output=True, encoding="utf-8", errors="ignore")
+    r = subprocess.run(
+        ["git", "-C", caminho_repositorio, "log", "-p", "-U0", "--pretty=format:commit %H"],
+        capture_output=True, encoding="utf-8", errors="ignore"
+    )
+
+    if r.returncode != 0:
+        print("Aviso: não foi possível ler o histórico do Git:", r.stderr.strip())
+        return []
 
     commit_atual = None
     arquivo_atual = None
-    if r.returncode != 0:
-        print("Erro ao executar o comando git log:", r.stderr)
-        return []
 
     for linha in r.stdout.splitlines():
         if linha.startswith("commit "):
@@ -67,7 +75,7 @@ def escanear_historico_git(caminho_repositorio):
             arquivo_atual = linha[6:]
         elif linha.startswith("+"):
             referencia = f"{arquivo_atual} (commit {commit_atual})"
-            achados = testar_conteudo (linha[1:], referencia)
+            achados = testar_conteudo(linha[1:], referencia)
             todos_achados.extend(achados)
 
     return todos_achados
