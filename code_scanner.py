@@ -1,7 +1,7 @@
 import re
 import os
 import json
-import git
+import subprocess
 
 padroes = {
     "AWS Key": r"AKIA[0-9A-Z]{16}",
@@ -52,20 +52,23 @@ def escanear_pasta(caminho_pasta):
 
 def escanear_historico_git(caminho_repositorio):
     todos_achados = []
-    repositorio = git.Repo(caminho_repositorio)
+    r = subprocess.run(["git", "-C", caminho_repositorio, "log", "-p", "-U0", "--pretty=format:commit %H"], capture_output=True, encoding="utf-8", errors="ignore")
 
-    for commit in repositorio.iter_commits():
-        for item in commit.tree.traverse():
-            if item.type == "blob":
-                try:
-                    conteudo_bytes = item.data_stream.read()
-                    conteudo_texto = conteudo_bytes.decode("utf-8", errors="ignore")
-                except Exception:
-                    continue
+    commit_atual = None
+    arquivo_atual = None
+    if r.returncode != 0:
+        print("Erro ao executar o comando git log:", r.stderr)
+        return []
 
-                referencia = f"{item.path} (commit {commit.hexsha[:7]})"
-                achados = testar_conteudo(conteudo_texto, referencia)
-                todos_achados.extend(achados)
+    for linha in r.stdout.splitlines():
+        if linha.startswith("commit "):
+            commit_atual = linha[7:14]
+        elif linha.startswith("+++ b/"):
+            arquivo_atual = linha[6:]
+        elif linha.startswith("+"):
+            referencia = f"{arquivo_atual} (commit {commit_atual})"
+            achados = testar_conteudo (linha[1:], referencia)
+            todos_achados.extend(achados)
 
     return todos_achados
 
@@ -78,8 +81,8 @@ def salvar_relatorio(achados, caminho_saida="relatorio.json"):
 if __name__ == "__main__":
     resultados = escanear_pasta(".")
     resultados_historico = escanear_historico_git(".")
-    todos_resultados = resultados + resultados_historico
 
+    todos_resultados = resultados + resultados_historico
     salvar_relatorio(todos_resultados)
 
     if todos_resultados:
