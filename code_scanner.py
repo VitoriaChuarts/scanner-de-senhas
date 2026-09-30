@@ -2,6 +2,7 @@ import re
 import os
 import json
 import subprocess
+import argparse
 
 padroes = {
     "AWS Key": r"AKIA[0-9A-Z]{16}",
@@ -92,8 +93,12 @@ def salvar_relatorio(achados, caminho_saida="relatorio.json"):
 
 
 if __name__ == "__main__":
-    resultados = escanear_pasta(".")
-    resultados_historico = escanear_historico_git(".")
+    parser = argparse.ArgumentParser(description="Procura segredos expostos em arquivos e no histórico do Git.")
+    parser.add_argument("pasta", nargs="?", default=".", help="pasta a escanear (padrão: pasta atual)")
+    args = parser.parse_args()
+
+    resultados = escanear_pasta(args.pasta)
+    resultados_historico = escanear_historico_git(args.pasta)
 
     todos_resultados = resultados + resultados_historico
     salvar_relatorio(todos_resultados)
